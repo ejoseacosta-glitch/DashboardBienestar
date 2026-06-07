@@ -37,13 +37,28 @@ grado = st.sidebar.multiselect(
 df = df[df[grado_col].isin(grado)]
 
 def resumen(variable):
-    c1,c2,c3,c4,c5,c6 = st.columns(6)
-    c1.metric("N", int(df[variable].count()))
-    c2.metric("Media", round(df[variable].mean(),2))
-    c3.metric("Mediana", round(df[variable].median(),2))
-    c4.metric("DE", round(df[variable].std(),2))
-    c5.metric("Mín", round(df[variable].min(),2))
-    c6.metric("Máx", round(df[variable].max(),2))
+
+    serie = pd.to_numeric(
+        df[variable],
+        errors="coerce"
+    )
+
+    if serie.notna().sum() > 0:
+
+        c1,c2,c3,c4,c5,c6 = st.columns(6)
+
+        c1.metric("N", int(serie.count()))
+        c2.metric("Media", round(serie.mean(),2))
+        c3.metric("Mediana", round(serie.median(),2))
+        c4.metric("DE", round(serie.std(),2))
+        c5.metric("Mín", round(serie.min(),2))
+        c6.metric("Máx", round(serie.max(),2))
+
+    else:
+
+        st.info(
+            "Variable categórica. Se muestran distribuciones y porcentajes."
+        )
 
 def porcentajes(variable):
     t = df[variable].value_counts(normalize=True).sort_index().reset_index()
