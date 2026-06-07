@@ -1,17 +1,12 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Jun  7 14:47:22 2026
-
-@author: Edson Acosta
-"""
-
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from collections import Counter
 import re
-import os
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+st.set_page_config(page_title="Dashboard Bienestar Escolar", layout="wide")
 
 FILE = "dashkaren/Ruta de fortalecimiento académico y bienestar – Grado 11  (respuestas).xlsx"
 
@@ -22,16 +17,16 @@ def cargar():
 df = cargar()
 
 grado_col = "Grado"
-org_col = [c for c in df.columns if "organizada tienes actualmente tu rutina" in c][0]
-prep_col = [c for c in df.columns if "preparado te sientes" in c][0]
-estrategias_col = [c for c in df.columns if "estrategias utilizas cuando estudias" in c][0]
-efec_col = [c for c in df.columns if "efectivas consideras" in c][0]
-dificultad_col = [c for c in df.columns if "qué es lo que más se te dificulta?" in c.lower() and "escoge" in c.lower()][0]
+org_col = [c for c in df.columns if "organizada tienes actualmente tu rutina" in c.lower()][0]
+prep_col = [c for c in df.columns if "preparado te sientes" in c.lower()][0]
+estrategias_col = [c for c in df.columns if "estrategias utilizas cuando estudias" in c.lower()][0]
+efec_col = [c for c in df.columns if "efectivas consideras" in c.lower()][0]
+dificultad_col = [c for c in df.columns if "qué es lo que más se te dificulta" in c.lower()][0]
 afront_col = [c for c in df.columns if "qué sueles hacer" in c.lower()][0]
 apoyo_fam_col = [c for c in df.columns if "percibes el apoyo de tu familia" in c.lower()][0]
 texto_col = df.columns[-1]
 
-st.title("📊 Dashboard de Fortalecimiento Académico y Bienestar")
+st.title("📊 Ruta de Fortalecimiento Académico y Bienestar")
 
 grado = st.sidebar.multiselect(
     "Filtrar grado",
@@ -41,129 +36,129 @@ grado = st.sidebar.multiselect(
 
 df = df[df[grado_col].isin(grado)]
 
-# KPIs
-c1,c2,c3,c4 = st.columns(4)
+def resumen(variable):
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    c1.metric("N", int(df[variable].count()))
+    c2.metric("Media", round(df[variable].mean(),2))
+    c3.metric("Mediana", round(df[variable].median(),2))
+    c4.metric("DE", round(df[variable].std(),2))
+    c5.metric("Mín", round(df[variable].min(),2))
+    c6.metric("Máx", round(df[variable].max(),2))
 
-c1.metric("Estudiantes", len(df))
-c2.metric("Media organización", round(df[org_col].mean(),2))
-c3.metric("Media efectividad", round(df[efec_col].mean(),2))
-c4.metric("Correlación Org.-Efectividad", round(df[[org_col,efec_col]].corr().iloc[0,1],2))
-
-st.divider()
-
-# Estadísticas descriptivas
-with st.expander("📈 Estadísticas descriptivas"):
-    st.dataframe(df[[org_col,efec_col]].describe().T)
-
-col1,col2 = st.columns(2)
-
-with col1:
-    fig = px.histogram(df,x=org_col,title="Organización de la rutina de estudio")
+def porcentajes(variable):
+    t = df[variable].value_counts(normalize=True).sort_index().reset_index()
+    t.columns=["Respuesta","Porcentaje"]
+    t["Porcentaje"]*=100
+    fig=px.bar(t,x="Respuesta",y="Porcentaje",text="Porcentaje")
+    fig.update_traces(texttemplate="%{y:.1f}%")
     st.plotly_chart(fig,use_container_width=True)
 
-with col2:
-    fig = px.histogram(df,x=efec_col,title="Efectividad percibida de las estrategias")
-    st.plotly_chart(fig,use_container_width=True)
-
-col3,col4 = st.columns(2)
-
-with col3:
-    fig = px.histogram(df,x=prep_col,title="Preparación para grado 11")
-    st.plotly_chart(fig,use_container_width=True)
-
-with col4:
-    fig = px.scatter(
-        df,
-        x=org_col,
-        y=efec_col,
-        color=grado_col,
-        title="Organización vs efectividad"
-    )
-    st.plotly_chart(fig,use_container_width=True)
-
-st.divider()
-
-# Función conteo múltiples respuestas
 def contar_multiple(serie):
-    conteo = Counter()
+    conteo=Counter()
     for x in serie.dropna():
         for item in str(x).split(","):
             item=item.strip()
             if item:
                 conteo[item]+=1
-    return pd.DataFrame(conteo.items(),columns=["Categoría","Frecuencia"]).sort_values(
-        "Frecuencia",ascending=False
-    )
+    out=pd.DataFrame(conteo.items(),columns=["Categoría","Frecuencia"])
+    out["Porcentaje"]=out["Frecuencia"]/len(df)*100
+    return out.sort_values("Frecuencia",ascending=False)
 
-st.subheader("📚 Estrategias de estudio utilizadas")
-estr = contar_multiple(df[estrategias_col])
-st.plotly_chart(
-    px.bar(
-        estr.head(15),
-        x="Frecuencia",
-        y="Categoría",
-        orientation="h"
-    ),
-    use_container_width=True
+tab1,tab2,tab3,tab4,tab5 = st.tabs(
+    ["📊 Resumen","📚 Académico","🧠 Bienestar","🚦 Riesgo","💬 Respuestas abiertas"]
 )
 
-st.subheader("⚠️ Dificultades académicas reportadas")
-dif = contar_multiple(df[dificultad_col])
-st.plotly_chart(
-    px.bar(dif.head(15),x="Frecuencia",y="Categoría",orientation="h"),
-    use_container_width=True
-)
+with tab1:
+    k1,k2,k3,k4=st.columns(4)
+    k1.metric("Estudiantes",len(df))
+    k2.metric("Media organización",round(df[org_col].mean(),2))
+    k3.metric("Media efectividad",round(df[efec_col].mean(),2))
+    k4.metric("Correlación",round(df[[org_col,efec_col]].corr().iloc[0,1],2))
 
-st.subheader("🧠 Estrategias de afrontamiento")
-afr = contar_multiple(df[afront_col])
-st.plotly_chart(
-    px.bar(afr.head(15),x="Frecuencia",y="Categoría",orientation="h"),
-    use_container_width=True
-)
+with tab2:
+    for var in [org_col, prep_col, efec_col]:
+        st.header(var)
+        resumen(var)
 
-st.subheader("👨‍👩‍👧 Apoyo familiar")
-st.plotly_chart(
-    px.histogram(df,x=apoyo_fam_col),
-    use_container_width=True
-)
+        fig=px.histogram(df,x=var,title=var)
+        fig.update_layout(height=500,margin=dict(l=80,r=40,t=80,b=80))
+        st.plotly_chart(fig,use_container_width=True)
 
-st.divider()
+        porcentajes(var)
+        st.divider()
 
-# Semáforo básico
-st.subheader("🚦 Indicador de riesgo académico")
+    st.header("Relación entre organización y efectividad")
+    corr=df[[org_col,efec_col]].corr().iloc[0,1]
+    st.metric("Correlación de Pearson",round(corr,3))
 
-riesgo = pd.DataFrame()
-riesgo["Nombre"] = df["Nombre completo"]
+    fig=px.density_heatmap(df,x=org_col,y=efec_col,text_auto=True)
+    fig.update_layout(height=650)
+    st.plotly_chart(fig,use_container_width=True)
 
-riesgo["Nivel"] = "Verde"
+    for titulo,columna in [
+        ("📚 Estrategias de estudio utilizadas", estrategias_col),
+        ("⚠️ Dificultades académicas reportadas", dificultad_col)
+    ]:
+        st.header(titulo)
+        tabla=contar_multiple(df[columna])
+        fig=px.bar(tabla,x="Porcentaje",y="Categoría",orientation="h",text="Porcentaje")
+        fig.update_layout(height=800,margin=dict(l=250,r=40,t=60,b=50))
+        st.plotly_chart(fig,use_container_width=True)
 
-cond_amarillo = (df[org_col] <= 3) | (df[efec_col] <= 3)
-cond_rojo = (df[org_col] <= 2) | (df[efec_col] <= 2)
+with tab3:
+    st.header(afront_col)
+    tabla=contar_multiple(df[afront_col])
+    fig=px.bar(tabla,x="Porcentaje",y="Categoría",orientation="h",text="Porcentaje")
+    fig.update_layout(height=800,margin=dict(l=250,r=40,t=60,b=50))
+    st.plotly_chart(fig,use_container_width=True)
 
-riesgo.loc[cond_amarillo,"Nivel"]="Amarillo"
-riesgo.loc[cond_rojo,"Nivel"]="Rojo"
+    st.header(apoyo_fam_col)
+    try:
+        resumen(apoyo_fam_col)
+    except:
+        pass
 
-st.dataframe(riesgo)
+    fig=px.histogram(df,x=apoyo_fam_col)
+    fig.update_layout(height=500)
+    st.plotly_chart(fig,use_container_width=True)
 
-st.metric("Casos en riesgo alto (Rojo)", (riesgo["Nivel"]=="Rojo").sum())
+with tab4:
+    st.info("""
+    Metodología:
+    🔴 Rojo: Organización ≤ 2 o Efectividad ≤ 2
+    🟡 Amarillo: Organización ≤ 3 o Efectividad ≤ 3
+    🟢 Verde: resto de estudiantes
+    """)
 
-st.divider()
+    riesgo=pd.DataFrame()
+    riesgo["Nombre"]=df["Nombre completo"]
+    riesgo["Nivel"]="Verde"
 
-# Respuestas abiertas
-st.subheader(" Respuestas abiertas")
+    riesgo.loc[(df[org_col]<=3)|(df[efec_col]<=3),"Nivel"]="Amarillo"
+    riesgo.loc[(df[org_col]<=2)|(df[efec_col]<=2),"Nivel"]="Rojo"
 
-texto = " ".join(df[texto_col].fillna("").astype(str))
+    st.dataframe(riesgo,use_container_width=True)
 
-palabras = re.findall(r"[a-záéíóúñ]+", texto.lower())
-stop = {"que","para","con","los","las","una","uno","del","por","más","muy","sus","sea","como","pero","porque","eso","este","esta","me","de","la","el","y","en","un"}
-palabras = [p for p in palabras if p not in stop and len(p)>3]
+    r=riesgo["Nivel"].value_counts().reset_index()
+    fig=px.pie(r,names="Nivel",values="count",hole=.5)
+    st.plotly_chart(fig,use_container_width=True)
 
-freq = pd.DataFrame(Counter(palabras).most_common(20),columns=["Palabra","Frecuencia"])
+with tab5:
+    st.header(texto_col)
 
-st.plotly_chart(
-    px.bar(freq,x="Frecuencia",y="Palabra",orientation="h",
-           title="Temas más frecuentes en respuestas abiertas"),
-    use_container_width=True
-)
+    texto=" ".join(df[texto_col].fillna("").astype(str))
 
-st.dataframe(df[[ "Nombre completo", texto_col ]])
+    stop={"que","para","con","los","las","una","uno","del","por","más",
+          "muy","sus","sea","como","pero","porque","eso","este","esta",
+          "me","de","la","el","y","en","un"}
+
+    wc=WordCloud(width=1600,height=800,background_color="white",
+                 stopwords=stop,collocations=False,max_words=100).generate(texto)
+
+    fig,ax=plt.subplots(figsize=(16,8))
+    ax.imshow(wc,interpolation="bilinear")
+    ax.axis("off")
+    st.pyplot(fig)
+
+    st.subheader("Comentarios registrados")
+    st.dataframe(df[[texto_col]],use_container_width=True)
