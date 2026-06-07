@@ -11,9 +11,6 @@ import plotly.express as px
 import streamlit as st
 from collections import Counter
 import re
-import os
-
-os.chdir("C:/Users/jose1/Downloads")
 
 st.set_page_config(page_title="Dashboard Bienestar Escolar", layout="wide")
 
