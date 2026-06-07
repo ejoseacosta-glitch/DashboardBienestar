@@ -13,10 +13,6 @@ from collections import Counter
 import re
 import os
 
-os.chdir("C:/Users/jose1/Downloads")
-
-st.set_page_config(page_title="Dashboard Bienestar Escolar", layout="wide")
-
 FILE = "Ruta de fortalecimiento académico y bienestar – Grado 11  (respuestas).xlsx"
 
 @st.cache_data
