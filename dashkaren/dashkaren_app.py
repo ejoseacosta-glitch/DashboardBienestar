@@ -13,7 +13,7 @@ from collections import Counter
 import re
 import os
 
-FILE = "Ruta de fortalecimiento académico y bienestar – Grado 11  (respuestas).xlsx"
+FILE = "dashkaren/Ruta de fortalecimiento académico y bienestar – Grado 11  (respuestas).xlsx"
 
 @st.cache_data
 def cargar():
